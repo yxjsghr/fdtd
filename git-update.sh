@@ -39,19 +39,15 @@ echo -e "\n${YELLOW}--- 2. 添加所有更改到暂存区 (git add .) ---${NC}"
 git add .
 echo -e "${GREEN}✅ 所有更改已添加。${NC}"
 
-# --- 步骤 4: 获取提交信息 ---
-echo -e "\n${YELLOW}--- 3. 请输入本次提交的信息 ---${NC}"
-read -p "提交信息: " COMMIT_MESSAGE
+# --- 步骤 4 & 5: 打开编辑器进行提交 ---
+echo -e "\n${YELLOW}--- 3. 即将打开文本编辑器以输入提交信息 ---${NC}"
+echo "提示: "
+echo "  - 在编辑器中详细输入您的提交信息。"
+echo "  - 以 '#' 开头的行是注释，将被忽略。"
+echo "  - 保存并关闭编辑器以完成提交。不输入任何信息直接关闭则会取消提交。"
+read -p "按回车键继续..."
 
-# 检查提交信息是否为空
-if [ -z "$COMMIT_MESSAGE" ]; then
-    echo -e "${RED}错误: 提交信息不能为空！操作已取消。${NC}"
-    exit 1
-fi
-
-# --- 步骤 5: 提交 ---
-echo -e "\n${YELLOW}--- 4. 提交到本地仓库 (git commit) ---${NC}"
-git commit -m "$COMMIT_MESSAGE"
+git commit
 
 # 检查 commit 是否成功
 if [ $? -ne 0 ]; then
