@@ -1,0 +1,24 @@
+# 编译输出目录
+build/
+fdtd2d/build/
+fdtd3d/build/
+
+# Python 虚拟环境
+venv_fdtd/
+
+# VSCode / Windsurf Editor 的配置文件
+.vscode/
+
+# Python 缓存文件
+__pycache__/
+*.pyc
+
+# 临时文件和日志文件
+*.log
+*.tmp
+.cache/
+# 模拟输出的数据文件 (假设它们很大)
+# 如果您的 .vti 文件很大，并且在特定目录下，可以这样写：
+# output_3d/
+# 或者用通配符
+# *.vti
