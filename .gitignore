@@ -2,7 +2,7 @@
 build/
 fdtd2d/build/
 fdtd3d/build/
-
+fdtd3d/visualizations/
 # Python 虚拟环境
 venv_fdtd/
 

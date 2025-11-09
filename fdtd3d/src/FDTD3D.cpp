@@ -36,7 +36,7 @@ void FDTD3D::setupGrid() {
     double nCFL = 2.0;
     m_dt = m_dx / (m_c0 * nCFL);
 
-    m_steps = 101;
+    m_steps = 1501;
 
     // 分配内存（严格 Yee 尺寸）
     Dx.assign(m_Nx * (m_Ny + 1) * (m_Nz + 1), 0.0);
@@ -1021,31 +1021,41 @@ void FDTD3D::updateH() {
 }
 
 void FDTD3D::dumpFrame(int step) {
+    std::vector<double> Ex_center(m_Nx * m_Ny * m_Nz, 0.0);
     std::vector<double> E_mag(m_Nx * m_Ny * m_Nz, 0.0);
     const double inv4 = 0.25;
 
-    auto center_e_sq = [&](int i, int j, int k) {
-        auto avg_sq = [&](double a, double b, double c, double d) {
-            return inv4 * (a * a + b * b + c * c + d * d);
-        };
-
-        double ex_sq = avg_sq(Ex[id_Ex(i, j, k)],     Ex[id_Ex(i, j + 1, k)],
-                              Ex[id_Ex(i, j, k + 1)], Ex[id_Ex(i, j + 1, k + 1)]);
-        double ey_sq = avg_sq(Ey[id_Ey(i, j, k)],     Ey[id_Ey(i + 1, j, k)],
-                              Ey[id_Ey(i, j, k + 1)], Ey[id_Ey(i + 1, j, k + 1)]);
-        double ez_sq = avg_sq(Ez[id_Ez(i, j, k)],     Ez[id_Ez(i + 1, j, k)],
-                              Ez[id_Ez(i, j + 1, k)], Ez[id_Ez(i + 1, j + 1, k)]);
-        return ex_sq + ey_sq + ez_sq;
+    auto cell_index = [&](int i, int j, int k) {
+        return (static_cast<size_t>(k) * m_Ny + static_cast<size_t>(j)) * m_Nx + static_cast<size_t>(i);
     };
 
     for (int i = 0; i < m_Nx; ++i) {
         for (int j = 0; j < m_Ny; ++j) {
             for (int k = 0; k < m_Nz; ++k) {
-                E_mag[i * m_Ny * m_Nz + j * m_Nz + k] = std::sqrt(center_e_sq(i, j, k));
+                double ex_avg = inv4 * (
+                    Ex[id_Ex(i, j, k)] + Ex[id_Ex(i, j + 1, k)] +
+                    Ex[id_Ex(i, j, k + 1)] + Ex[id_Ex(i, j + 1, k + 1)]
+                );
+                double ey_avg = inv4 * (
+                    Ey[id_Ey(i, j, k)] + Ey[id_Ey(i + 1, j, k)] +
+                    Ey[id_Ey(i, j, k + 1)] + Ey[id_Ey(i + 1, j, k + 1)]
+                );
+                double ez_avg = inv4 * (
+                    Ez[id_Ez(i, j, k)] + Ez[id_Ez(i + 1, j, k)] +
+                    Ez[id_Ez(i, j + 1, k)] + Ez[id_Ez(i + 1, j + 1, k)]
+                );
+
+                size_t idx = cell_index(i, j, k);
+                Ex_center[idx] = ex_avg;
+                double e_sq = ex_avg * ex_avg + ey_avg * ey_avg + ez_avg * ez_avg;
+                E_mag[idx] = std::sqrt(e_sq);
             }
         }
     }
 
+    // 可视化左列依赖 Ex (瞬时值)，若不需要可注释掉下一行以减少输出数据
+    m_out->saveScalar3D_VTI("Ex", Ex_center, m_Nx, m_Ny, m_Nz, m_dx, m_dy, m_dz, step);
+    // 右上子图可使用瞬时 |E|；若只保留 RMS，可注释掉下一行
     m_out->saveScalar3D_VTI("E_mag", E_mag, m_Nx, m_Ny, m_Nz, m_dx, m_dy, m_dz, step);
 }
 
@@ -1056,6 +1066,9 @@ void FDTD3D::run() {
     int n_T0d2 = n_T0 / 2;
 
     std::vector<double> E_mag_sq(m_Nx * m_Ny * m_Nz, 0.0);
+    auto cell_index = [&](int i, int j, int k) {
+        return (static_cast<size_t>(k) * m_Ny + static_cast<size_t>(j)) * m_Nx + static_cast<size_t>(i);
+    };
     const double inv16 = 1.0 / 16.0;
 
     auto center_e_sq = [&](int i, int j, int k) {
@@ -1078,13 +1091,14 @@ void FDTD3D::run() {
             for (int j = 0; j < m_Ny; ++j) {
                 for (int k = 0; k < m_Nz; ++k) {
                     double e_sq = center_e_sq(i, j, k);
-                    E_mag_sq[i * m_Ny * m_Nz + j * m_Nz + k] += e_sq * (4.0 / n_T0);
+                    E_mag_sq[cell_index(i, j, k)] += e_sq * (4.0 / n_T0);
                 }
             }
         }
         if ((n + 1) % n_T0d2 == 0) {
             std::vector<double> E_mag(m_Nx * m_Ny * m_Nz);
             for (size_t p = 0; p < E_mag.size(); ++p) E_mag[p] = std::sqrt(E_mag_sq[p]);
+            // 可视化右列也支持 RMS 幅值；若只需瞬时 |E|，可注释掉下一行
             m_out->saveScalar3D_VTI("E_mag_rms", E_mag, m_Nx, m_Ny, m_Nz, m_dx, m_dy, m_dz, n + 1);
         }
 

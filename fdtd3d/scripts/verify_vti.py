@@ -26,6 +26,25 @@ except ImportError:
     HAS_MATPLOTLIB = False
     print("[警告] 未安装matplotlib，将跳过可视化")
 
+
+TIME_STEP_PATTERN = re.compile(r'_t(\d+)\.vti$')
+MAX_SERIES_STEPS = 1500
+
+
+def extract_time_step(path):
+    """提取文件名中的时间步编号，若不存在则返回None"""
+    match = TIME_STEP_PATTERN.search(os.path.basename(path))
+    return int(match.group(1)) if match else None
+
+
+def sort_vti_files(files):
+    """按照时间步编号对VTI文件排序，无法解析的排在最后"""
+    def sort_key(path):
+        time_step = extract_time_step(path)
+        return (0, time_step) if time_step is not None else (1, os.path.basename(path))
+
+    return sorted(files, key=sort_key)
+
 def read_vti_xml(vti_path):
     """直接从XML格式的VTI文件读取数据（不依赖vtk库）"""
     import xml.etree.ElementTree as ET
@@ -190,7 +209,10 @@ def verify_consistency(files, output_dir):
     stats_list = []
     times = []
     
-    for vti_file in sorted(files)[:10]:  # 只检查前10个文件
+    sorted_files = sort_vti_files(files)
+    max_steps = min(MAX_SERIES_STEPS, len(sorted_files))
+    
+    for vti_file in sorted_files[:max_steps]:
         # 提取时间步
         match = re.search(r'_t(\d+)\.vti', vti_file)
         if match:
@@ -282,6 +304,7 @@ def main():
         pattern = re.compile(args.pattern)
         files = [os.path.join(args.dir, f) for f in os.listdir(args.dir) 
                 if pattern.match(f) and f.endswith('.vti')]
+        files = sort_vti_files(files)
         
         if not files:
             print(f"[错误] 在 {args.dir} 中未找到匹配的VTI文件")
